@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gran Derby Virtual - Final</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Bungee+Spice&family=Roboto:wght@400;700&display=swap');
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f0fdf4;
+            user-select: none;
+            overflow-x: hidden;
+        }
+
+        .title-font {
+            font-family: 'Bungee Spice', cursive;
+        }
+
+        /* Pista con textura de tierra */
+        .track-bg {
+            background-color: #5d4037;
+            background-image: 
+                repeating-linear-gradient(45deg, #6d4c41 0px, #6d4c41 10px, #5d4037 10px, #5d4037 20px),
+                radial-gradient(circle at 50% 50%, rgba(0,0,0,0.1) 0%, transparent 50%);
+            box-shadow: inset 0 0 30px rgba(0,0,0,0.6);
+        }
+
+        /* Línea de meta */
+        .finish-line {
+            background-image: 
+                linear-gradient(45deg, #000 25%, transparent 25%), 
+                linear-gradient(-45deg, #000 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, #000 75%), 
+                linear-gradient(-45deg, transparent 75%, #000 75%);
+            background-size: 20px 20px;
+            background-color: #fff;
+            width: 30px; /* Ancho de la meta */
+            height: 100%;
+            position: absolute;
+            right: 80px; /* Distancia desde el borde derecho */
+            top: 0;
+            z-index: 0;
+            box-shadow: -2px 0 5px rgba(0,0,0,0.3);
+            border-left: 2px solid white;
+        }
+
+        /* Contenedor del caballo */
+        .horse-container {
+            transition: transform 0.03s linear; /* Ultra suave para alta velocidad */
+            will-change: transform;
+            position: absolute;
+            left: 0;
+            /* width: 70px; definido inline para lógica JS */
+        }
+
+        /* Emoji invertido */
+        .horse-emoji {
+            display: inline-block;
+            transform: scaleX(-1); 
+            filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.3));
+            font-size: 3rem;
+        }
+
+        /* Animación de galope */
+        @keyframes gallop {
+            0% { transform: scaleX(-1) translateY(0) rotate(0deg); }
+            25% { transform: scaleX(-1) translateY(-5px) rotate(-3deg); }
+            50% { transform: scaleX(-1) translateY(-2px) rotate(0deg); }
+            75% { transform: scaleX(-1) translateY(-5px) rotate(3deg); }
+            100% { transform: scaleX(-1) translateY(0) rotate(0deg); }
+        }
+        
+        .is-racing .horse-emoji {
+            animation: gallop 0.25s infinite;
+        }
+
+        /* Efecto de polvo */
+        .dust-effect::after {
+            content: '';
+            position: absolute;
+            bottom: 5px;
+            left: -10px;
+            width: 15px;
+            height: 15px;
+            background: rgba(189, 154, 122, 0.7);
+            border-radius: 50%;
+            filter: blur(4px);
+            animation: dust 0.4s infinite;
+        }
+        @keyframes dust {
+            0% { opacity: 0; transform: scale(0.5) translateX(0); }
+            50% { opacity: 1; }
+            100% { opacity: 0; transform: scale(2) translateX(-30px); }
+        }
+
+        .modal { background: rgba(0, 0, 0, 0.85); }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center pb-10">
+
+    <header class="w-full bg-green-900 text-white p-6 shadow-xl text-center border-b-4 border-yellow-500 relative overflow-hidden">
+        <h1 class="text-4xl md:text-6xl title-font mb-2 tracking-wider relative z-10">GRAN DERBY</h1>
+        <p class="text-green-300 uppercase tracking-widest text-xs font-bold relative z-10">Simulador de Carreras</p>
+    </header>
+
+    <!-- PANEL 1: CONFIGURACIÓN -->
+    <main class="w-full max-w-5xl px-4 mt-8 flex flex-col gap-6 transition-all duration-500" id="setup-panel">
+        
+        <div class="bg-white p-6 rounded-xl shadow-lg border-l-8 border-green-600">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <span>📋</span> Inscribir Caballos
+            </h2>
+            
+            <div class="flex flex-col md:flex-row gap-2 mb-6">
+                <input type="text" id="newHorseName" placeholder="Nombre (Ej. Relámpago)" 
+                    class="flex-1 border-2 border-gray-300 rounded-lg p-3 focus:outline-none focus:border-green-600 transition text-lg"
+                    onkeypress="if(event.key === 'Enter') addHorse()">
+                <button onclick="addHorse()" 
+                    class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg transition transform active:scale-95 shadow-md">
+                    + AÑADIR
+                </button>
+            </div>
+
+            <!-- Lista de Caballos -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3" id="horseList">
+                <!-- Se llena con JS -->
+            </div>
+
+            <div class="mt-4 flex justify-between items-center text-sm">
+                <span class="text-gray-500 italic" id="countDisplay">0 Participantes</span>
+                <span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded border border-yellow-200">Mínimo 2 para correr</span>
+            </div>
+        </div>
+
+        <div class="flex flex-wrap justify-center gap-4">
+            <button onclick="prepareRace()" id="btnPlay" disabled
+                class="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white text-xl font-bold py-4 px-12 rounded-full shadow-xl transition transform hover:scale-105 flex items-center gap-3">
+                <span>🏁</span> INICIAR CARRERA
+            </button>
+            
+            <button onclick="clearAll()" id="btnClear" disabled
+                class="bg-red-500 hover:bg-red-600 disabled:bg-red-300 disabled:cursor-not-allowed text-white font-bold py-3 px-8 rounded-lg shadow-md transition">
+                🗑️ Borrar Todo
+            </button>
+        </div>
+    </main>
+
+    <!-- PANEL 2: PISTA DE CARRERAS -->
+    <div id="race-container" class="w-full max-w-7xl mt-4 hidden opacity-0 transition-opacity duration-1000">
+        <div class="flex justify-between items-end px-4 mb-1 text-white font-bold text-sm uppercase tracking-wider">
+            <span>Salida</span>
+            <div class="text-center animate-pulse text-yellow-400 text-xl font-mono" id="live-commentary">Preparados...</div>
+            <span class="mr-12">Meta 🏁</span>
+        </div>
+        
+        <div id="track" class="track-bg w-full rounded-xl overflow-hidden relative shadow-2xl border-4 border-yellow-700/50">
+            <div class="finish-line"></div>
+            <!-- Carriles dinámicos -->
+        </div>
+    </div>
+
+    <!-- MODAL RESULTADOS -->
+    <div id="resultModal" class="modal fixed inset-0 flex items-center justify-center hidden z-50 p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden transform scale-90 opacity-0 transition-all duration-300" id="modalContent">
+            <div class="bg-gradient-to-r from-yellow-400 to-yellow-600 p-6 text-center shadow-md relative">
+                <h2 class="text-4xl font-bold text-white title-font drop-shadow-md">🏆 RESULTADOS</h2>
+                <div class="absolute top-2 right-2 text-white opacity-50 text-xs">Finalizado</div>
+            </div>
+            
+            <div class="p-6 bg-gray-50">
+                <ul id="winnersList" class="space-y-2 mb-8">
+                    <!-- Lista de ganadores -->
+                </ul>
+                
+                <!-- BOTONES DE NAVEGACIÓN -->
+                <div class="flex flex-col gap-3">
+                    <button onclick="playReplay()" class="w-full bg-purple-600 text-white font-bold py-3 px-6 rounded-xl hover:bg-purple-700 transition shadow-lg flex justify-center items-center gap-2">
+                        <span>▶️</span> Ver Replay de la Carrera
+                    </button>
+                    <button onclick="resetToRace()" class="w-full bg-blue-600 text-white font-bold py-3 px-6 rounded-xl hover:bg-blue-700 transition shadow-lg flex justify-center items-center gap-2">
+                        <span>🔄</span> Correr de nuevo (Mismos caballos)
+                    </button>
+                    <button onclick="resetToSetup()" class="w-full bg-gray-200 text-gray-700 font-bold py-3 px-6 rounded-xl hover:bg-gray-300 transition flex justify-center items-center gap-2">
+                        <span>📋</span> Modificar Participantes / Volver al Inicio
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- OVERLAY CUENTA REGRESIVA -->
+    <div id="overlay" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center hidden z-40 backdrop-blur-sm">
+        <div class="text-center">
+            <div class="text-8xl mb-4 animate-bounce">🎺</div>
+            <div class="text-white text-5xl md:text-7xl font-bold animate-pulse" id="overlay-text">
+                PREPARADOS
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Variables Globales ---
+        let horses = [];
+        let isRacing = false;
+        let raceInterval = null;
+        let musicInterval = null;
+        let finishedCount = 0;
+        let audioCtx = null;
+        let masterGain = null;
+        let raceReplayData = []; // Almacena los datos de la carrera para replay
+        let isReplaying = false;
+        let replayInterval = null;
+        let replayFrameIndex = 0;
+        
+        // Dimensiones críticas para "Apenas toquen la meta"
+        const HORSE_WIDTH = 70; // Ancho visual del contenedor del caballo (px)
+        const FINISH_LINE_RIGHT_OFFSET = 80; // Donde empieza la meta desde la derecha (px)
+        
+        // --- Sistema de Audio ---
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 0.25; 
+                masterGain.connect(audioCtx.destination);
+            }
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function playTone(freq, duration, type = 'square', vol = 0.1) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(masterGain);
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+
+        function playFanfare() {
+            return new Promise((resolve) => {
+                initAudio();
+                [392, 523, 659, 783, 523, 783].forEach((f, i) => {
+                    setTimeout(() => playTone(f, 0.15, 'sawtooth', 0.2), i * 120);
+                });
+                setTimeout(() => playTone(523, 0.8, 'square', 0.25), 800);
+                setTimeout(resolve, 1500);
+            });
+        }
+
+        function startRaceMusic() {
+            initAudio();
+            let noteIndex = 0;
+            const bassLine = [146, 146, 196, 196, 146, 146, 220, 196]; 
+            const melody = [392, 0, 392, 0, 440, 392, 349, 329]; 
+
+            musicInterval = setInterval(() => {
+                if (!isRacing) { clearInterval(musicInterval); return; }
+                if (noteIndex % 2 === 0) playTone(100, 0.05, 'sawtooth', 0.05); // Cascos
+                playTone(bassLine[noteIndex % bassLine.length], 0.1, 'triangle', 0.1); // Bajo
+                if (noteIndex % 4 === 0) {
+                     const mel = melody[(noteIndex / 4) % melody.length];
+                     if(mel) playTone(mel, 0.2, 'square', 0.08); // Melodía
+                }
+                noteIndex++;
+            }, 105); 
+        }
+
+        function stopMusic() {
+            clearInterval(musicInterval);
+        }
+
+        // --- Gestión de Caballos ---
+        
+        function generateId() { return 'h_' + Date.now() + '_' + Math.floor(Math.random() * 1000); }
+
+        function updateUIState() {
+            const btnPlay = document.getElementById('btnPlay');
+            const btnClear = document.getElementById('btnClear');
+            const count = horses.length;
+            
+            document.getElementById('countDisplay').innerText = `${count} Participante${count !== 1 ? 's' : ''}`;
+            btnPlay.disabled = count < 2;
+            btnClear.disabled = count === 0;
+            
+            const list = document.getElementById('horseList');
+            list.innerHTML = '';
+            
+            horses.forEach((h, index) => {
+                list.innerHTML += `
+                    <div class="flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-200 shadow-sm animate-fade-in hover:bg-green-50 transition">
+                        <div class="flex items-center gap-3 overflow-hidden">
+                            <span class="text-lg font-bold text-gray-400 w-6">#${index + 1}</span>
+                            <div class="text-2xl transform -scale-x-100">🏇</div>
+                            <span class="font-bold text-gray-700 truncate text-lg">${h.name}</span>
+                        </div>
+                        <div class="flex gap-2 shrink-0">
+                            <button onclick="editHorse('${h.id}')" class="bg-blue-100 text-blue-600 hover:bg-blue-200 p-2 rounded-md font-bold text-sm transition">✏️</button>
+                            <button onclick="removeHorse('${h.id}')" class="bg-red-100 text-red-600 hover:bg-red-200 p-2 rounded-md font-bold text-sm transition">🗑️</button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function addHorse() {
+            const input = document.getElementById('newHorseName');
+            const name = input.value.trim();
+            if (!name) return;
+            horses.push({ id: generateId(), name: name, posPx: 0, speed: 0, fatigue: 0, finished: false, rank: 0, colorIdx: Math.floor(Math.random() * 6) });
+            input.value = '';
+            updateUIState();
+        }
+
+        function removeHorse(id) {
+            horses = horses.filter(h => h.id !== id);
+            updateUIState();
+        }
+
+        window.editHorse = function(id) {
+            const horse = horses.find(h => h.id === id);
+            if (!horse) return;
+            const newName = prompt(`Editar nombre:`, horse.name);
+            if (newName && newName.trim()) {
+                horse.name = newName.trim();
+                updateUIState();
+            }
+        };
+
+        function clearAll() {
+            if (horses.length === 0) return;
+            if(confirm("¿Eliminar todos los participantes?")) {
+                horses = [];
+                updateUIState();
+            }
+        }
+
+        // --- Lógica de Carrera Precisa ---
+
+        async function prepareRace() {
+            if (horses.length < 2) return;
+
+            // Detener cualquier replay en curso
+            if (isReplaying) stopReplay();
+
+            document.getElementById('setup-panel').classList.add('hidden');
+            const raceContainer = document.getElementById('race-container');
+            raceContainer.classList.remove('hidden');
+            setTimeout(() => raceContainer.classList.remove('opacity-0'), 50);
+
+            const track = document.getElementById('track');
+            const finishLine = track.querySelector('.finish-line');
+            track.innerHTML = ''; 
+            track.appendChild(finishLine);
+
+            const colors = ['text-red-600', 'text-blue-600', 'text-green-600', 'text-yellow-600', 'text-purple-600', 'text-pink-600'];
+
+            horses.forEach((h, idx) => {
+                h.posPx = 0; // Posición en Pixeles reales
+                h.finished = false;
+                h.fatigue = 0;
+                
+                const lane = document.createElement('div');
+                lane.className = 'relative h-20 border-b border-white/10 flex items-center w-full';
+                lane.style.backgroundColor = idx % 2 === 0 ? 'rgba(0,0,0,0.05)' : 'transparent';
+                
+                lane.innerHTML = `
+                    <div class="absolute left-2 text-white/20 font-bold text-5xl select-none z-0 font-mono italic">${idx + 1}</div>
+                    <div id="horse-${h.id}" class="horse-container dust-effect flex flex-col items-center" style="width: ${HORSE_WIDTH}px; left: 0px;">
+                        <span class="text-xs font-bold text-white bg-black/70 px-2 py-0.5 rounded-full mb-[-8px] whitespace-nowrap z-20 shadow-md border border-white/20">${h.name}</span>
+                        <span class="horse-emoji ${colors[h.colorIdx]}">🏇</span>
+                    </div>
+                `;
+                track.appendChild(lane);
+            });
+
+            // Cuenta Regresiva
+            const overlay = document.getElementById('overlay');
+            const overlayText = document.getElementById('overlay-text');
+            overlay.classList.remove('hidden');
+            
+            overlayText.innerText = "PREPARADOS...";
+            overlayText.className = "text-white text-5xl font-bold animate-pulse";
+            await playFanfare();
+            
+            overlayText.innerText = "LISTOS...";
+            overlayText.className = "text-yellow-400 text-6xl font-bold";
+            playTone(400, 0.1);
+            
+            await new Promise(r => setTimeout(r, 600));
+            overlayText.innerText = "¡YA!";
+            overlayText.className = "text-green-500 text-8xl font-bold scale-150 transition-transform duration-200";
+            playTone(800, 0.5, 'sawtooth');
+            
+            startRaceLogic();
+            
+            setTimeout(() => overlay.classList.add('hidden'), 500);
+        }
+
+        function startRaceLogic() {
+            isRacing = true;
+            finishedCount = 0;
+            document.body.classList.add('is-racing');
+            document.getElementById('live-commentary').innerText = "¡Arrancan!";
+            
+            // Inicializar grabación de replay
+            raceReplayData = [];
+            
+            startRaceMusic();
+
+            // Velocidad base aleatoria
+            horses.forEach(h => {
+                h.speed = 4 + Math.random() * 3;
+            });
+
+            raceInterval = setInterval(updateRace, 30);
+        }
+
+        function updateRace() {
+            if (!isRacing) return;
+
+            const trackWidth = document.getElementById('track').clientWidth;
+            // La meta está en trackWidth - FINISH_LINE_RIGHT_OFFSET
+            // El caballo gana cuando (Left + HORSE_WIDTH) >= Meta
+            const finishLineX = trackWidth - FINISH_LINE_RIGHT_OFFSET;
+            const winningDistance = finishLineX - HORSE_WIDTH;
+
+            let allFinished = true;
+            const maxPos = Math.max(...horses.map(h => h.posPx));
+
+            horses.forEach(h => {
+                if (!h.finished) {
+                    allFinished = false;
+
+                    // Lógica de movimiento (Fatiga y Adrenalina)
+                    if (h.speed > 2.0) h.fatigue += 0.05;
+                    if (h.speed < 1.9 && h.fatigue > 0) h.fatigue -= 0.1;
+
+                    const distanceToLeader = maxPos - h.posPx;
+                    let adrenaline = 0;
+                    if (distanceToLeader > 150) { 
+                        adrenaline = 0.5 + (Math.random() * 0.5); 
+                        if (Math.random() > 0.96) adrenaline += 2.0; 
+                    }
+
+                    const randomFlux = (Math.random() - 0.5) * 0.8;
+                    h.speed += randomFlux + adrenaline - (h.fatigue * 0.1);
+
+                    // Clamping de velocidad
+                    if (h.speed < 1.0) h.speed = 1.0; 
+                    if (h.speed > 3.0) h.speed = 3.0; 
+
+                    // Actualizar posición píxeles
+                    h.posPx += h.speed;
+
+                    // Chequeo de Victoria "Al Toque"
+                    if (h.posPx >= winningDistance) {
+                        h.finished = true;
+                        h.posPx = winningDistance + 20; // Cruzar un poco para efecto visual
+                        finishedCount++;
+                        h.rank = finishedCount;
+                        
+                        // Visual
+                        const elem = document.getElementById(`horse-${h.id}`);
+                        elem.querySelector('.horse-emoji').style.filter = "grayscale(100%)";
+                        elem.classList.remove('dust-effect');
+                        
+                        document.getElementById('live-commentary').innerText = `¡${h.name} cruza!`;
+                    }
+
+                    // Renderizar
+                    const elem = document.getElementById(`horse-${h.id}`);
+                    if (elem) elem.style.transform = `translateX(${h.posPx}px)`;
+                }
+            });
+
+            // Grabar frame para replay
+            if (isRacing) {
+                raceReplayData.push({
+                    frame: raceReplayData.length,
+                    horses: horses.map(h => ({
+                        id: h.id,
+                        posPx: h.posPx,
+                        finished: h.finished,
+                        rank: h.rank
+                    })),
+                    commentary: document.getElementById('live-commentary').innerText
+                });
+            }
+
+            if (allFinished) {
+                finishRace();
+            }
+        }
+
+        function finishRace() {
+            isRacing = false;
+            clearInterval(raceInterval);
+            stopMusic();
+            document.body.classList.remove('is-racing');
+            
+            playTone(523, 0.1); playTone(659, 0.1); playTone(783, 0.6);
+
+            setTimeout(showResults, 800);
+            document.getElementById('live-commentary').innerText = "Carrera Finalizada";
+        }
+
+        function showResults() {
+            const modal = document.getElementById('resultModal');
+            const modalContent = document.getElementById('modalContent');
+            const list = document.getElementById('winnersList');
+            
+            const sorted = [...horses].sort((a, b) => a.rank - b.rank);
+            
+            list.innerHTML = '';
+            sorted.forEach((h, i) => {
+                let icon = `<span class="font-bold text-gray-500">#${i+1}</span>`;
+                let style = "bg-white";
+                if (i === 0) { icon = '🥇'; style = "bg-yellow-100 border-2 border-yellow-400"; }
+                else if (i === 1) { icon = '🥈'; style = "bg-gray-100"; }
+                else if (i === 2) { icon = '🥉'; style = "bg-orange-50"; }
+
+                list.innerHTML += `
+                    <li class="flex items-center justify-between p-3 rounded-lg ${style} border border-gray-200">
+                        <div class="flex items-center gap-3">
+                            <span class="text-2xl">${icon}</span>
+                            <span class="font-bold text-gray-800">${h.name}</span>
+                        </div>
+                    </li>
+                `;
+            });
+
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modalContent.classList.remove('scale-90', 'opacity-0');
+                modalContent.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
+
+        // --- Sistema de Replay ---
+
+        function playReplay() {
+            if (raceReplayData.length === 0) {
+                alert('No hay datos de replay disponibles');
+                return;
+            }
+
+            closeModal();
+            
+            // Preparar la pista para el replay
+            document.getElementById('setup-panel').classList.add('hidden');
+            const raceContainer = document.getElementById('race-container');
+            raceContainer.classList.remove('hidden');
+            raceContainer.classList.remove('opacity-0');
+
+            const track = document.getElementById('track');
+            const finishLine = track.querySelector('.finish-line');
+            track.innerHTML = '';
+            track.appendChild(finishLine);
+
+            const colors = ['text-red-600', 'text-blue-600', 'text-green-600', 'text-yellow-600', 'text-purple-600', 'text-pink-600'];
+
+            // Recrear los caballos en la pista
+            horses.forEach((h, idx) => {
+                const lane = document.createElement('div');
+                lane.className = 'relative h-20 border-b border-white/10 flex items-center w-full';
+                lane.style.backgroundColor = idx % 2 === 0 ? 'rgba(0,0,0,0.05)' : 'transparent';
+                
+                lane.innerHTML = `
+                    <div class="absolute left-2 text-white/20 font-bold text-5xl select-none z-0 font-mono italic">${idx + 1}</div>
+                    <div id="horse-${h.id}" class="horse-container dust-effect flex flex-col items-center" style="width: ${HORSE_WIDTH}px; left: 0px;">
+                        <span class="text-xs font-bold text-white bg-black/70 px-2 py-0.5 rounded-full mb-[-8px] whitespace-nowrap z-20 shadow-md border border-white/20">${h.name}</span>
+                        <span class="horse-emoji ${colors[h.colorIdx]}">🏇</span>
+                    </div>
+                `;
+                track.appendChild(lane);
+            });
+
+            // Iniciar replay
+            isReplaying = true;
+            replayFrameIndex = 0;
+            document.body.classList.add('is-racing');
+            document.getElementById('live-commentary').innerText = "Replay...";
+            
+            startRaceMusic();
+
+            replayInterval = setInterval(() => {
+                if (replayFrameIndex >= raceReplayData.length) {
+                    stopReplay();
+                    setTimeout(showResults, 800);
+                    return;
+                }
+
+                const frame = raceReplayData[replayFrameIndex];
+                
+                // Actualizar posiciones de los caballos
+                frame.horses.forEach(horseData => {
+                    const horse = horses.find(h => h.id === horseData.id);
+                    if (horse) {
+                        horse.posPx = horseData.posPx;
+                        horse.finished = horseData.finished;
+                        horse.rank = horseData.rank;
+
+                        const elem = document.getElementById(`horse-${horse.id}`);
+                        if (elem) {
+                            elem.style.transform = `translateX(${horse.posPx}px)`;
+                            
+                            // Aplicar efectos visuales si terminó
+                            if (horse.finished) {
+                                const emoji = elem.querySelector('.horse-emoji');
+                                if (emoji) emoji.style.filter = "grayscale(100%)";
+                                elem.classList.remove('dust-effect');
+                            } else {
+                                const emoji = elem.querySelector('.horse-emoji');
+                                if (emoji) emoji.style.filter = "";
+                                elem.classList.add('dust-effect');
+                            }
+                        }
+                    }
+                });
+
+                // Actualizar comentario
+                if (frame.commentary) {
+                    document.getElementById('live-commentary').innerText = frame.commentary;
+                }
+
+                replayFrameIndex++;
+            }, 30); // Misma velocidad que la carrera original
+        }
+
+        function stopReplay() {
+            isReplaying = false;
+            clearInterval(replayInterval);
+            stopMusic();
+            document.body.classList.remove('is-racing');
+            document.getElementById('live-commentary').innerText = "Replay Finalizado";
+        }
+
+        // --- Navegación Post-Carrera ---
+
+        function closeModal() {
+            const modal = document.getElementById('resultModal');
+            const modalContent = document.getElementById('modalContent');
+            modalContent.classList.remove('scale-100', 'opacity-100');
+            modalContent.classList.add('scale-90', 'opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+
+        function resetToRace() {
+            closeModal();
+            if (isReplaying) stopReplay();
+            prepareRace(); // Reinicia directamente
+        }
+
+        function resetToSetup() {
+            closeModal();
+            if (isReplaying) stopReplay();
+            document.getElementById('race-container').classList.add('hidden');
+            document.getElementById('setup-panel').classList.remove('hidden');
+            
+            // Resetear datos internos pero mantener la lista
+            horses.forEach(h => {
+                h.posPx = 0;
+                h.speed = 0;
+                h.finished = false;
+                h.rank = 0;
+            });
+            updateUIState();
+        }
+
+        // Init
+        updateUIState();
+
+    </script>
+</body>
+</html>
